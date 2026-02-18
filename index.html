@@ -4,8 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>App de Pagos - Finanzas Personales</title>
-    <link rel="stylesheet" href="style.css">
+    <!-- Agregamos ?v=1 para forzar al navegador a leer el archivo nuevo -->
+    <link rel="stylesheet" href="style.css?v=1.0.1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -23,15 +27,17 @@
         </header>
 
         <main id="main-content">
-            <!-- Cargando... -->
+            <!-- La aplicación se carga aquí -->
         </main>
 
         <footer>
-            <p>&copy; 2026 App de Pagos</p>
+            <p>&copy; 2026 App de Pagos - Gestión Financiera</p>
         </footer>
     </div>
+    <!-- Bibliotecas externas -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="main.js"></script>
+    <!-- Lógica principal con versión para evitar caché -->
+    <script src="main.js?v=1.0.1"></script>
 </body>
 
 </html>

@@ -9,7 +9,7 @@ let state = {
 
 let mainChart = null;
 
-// Cargar datos desde LocalStorage de forma segura
+// Cargar datos desde LocalStorage
 function loadPersistedData() {
     try {
         state.fixedItems = JSON.parse(localStorage.getItem('fixedItems')) || [];
@@ -72,7 +72,7 @@ function renderFixedItems(container) {
     section.innerHTML = `
         <div class="section-header">
             <h2>Artículos Fijos</h2>
-            <p>${state.fixedItems.length} artículos configurados</p>
+            <p>${state.fixedItems.length} artículos</p>
         </div>
         <div class="form-card">
             <div class="grid-form">
@@ -98,7 +98,19 @@ function renderFixedItems(container) {
         <div class="section-header">
             <h2>Resumen Quincenal</h2>
         </div>
-        <div class="comparison-grid" id="config-summary"></div>
+        <div class="comparison-grid" id="config-summary" style="margin-bottom: 3rem;"></div>
+
+        <div class="backup-section">
+            <h3>Sincronización y Respaldo</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Usa estos botones para pasar tus datos de un dispositivo a otro (PC al Celular).
+            </p>
+            <div class="backup-btns">
+                <button class="btn-add" style="margin:0; flex:1;" onclick="exportData()">Descargar Copia (JSON)</button>
+                <button class="btn-add" style="margin:0; flex:1; background:var(--secondary)" onclick="document.getElementById('import-file').click()">Subir Copia</button>
+                <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
+            </div>
+        </div>
     `;
     container.appendChild(section);
 
@@ -151,31 +163,22 @@ function renderConfigSummary() {
     const summaryContainer = document.getElementById('config-summary');
     if (!summaryContainer) return;
 
-    const ranges = ['1er quincena', '2da quincena'];
-
-    ranges.forEach(range => {
+    ['1er quincena', '2da quincena'].forEach(range => {
         const items = state.fixedItems.filter(i => i.range === range);
         const total = items.reduce((acc, i) => acc + Number(i.value), 0);
 
         const card = document.createElement('div');
         card.className = 'summary-card';
         card.innerHTML = `
-            <h3>${range === '1er quincena' ? '1er Quincena' : '2da Quincena'}</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--primary);">${range === '1er quincena' ? '1er Quincena' : '2da Quincena'}</h3>
             <table class="summary-table">
-                <thead>
-                    <tr><th>Artículo</th><th style="text-align:right">Valor</th></tr>
-                </thead>
+                <thead><tr><th>Artículo</th><th style="text-align:right">Valor</th></tr></thead>
                 <tbody>
-                    ${items.map(i => `
-                        <tr><td>${i.name}</td><td style="text-align:right">$${Number(i.value).toLocaleString()}</td></tr>
-                    `).join('')}
-                    ${items.length === 0 ? '<tr><td colspan="2" style="text-align:center; color:var(--text-muted)">Sin artículos</td></tr>' : ''}
+                    ${items.map(i => `<tr><td>${i.name}</td><td style="text-align:right">$${Number(i.value).toLocaleString()}</td></tr>`).join('')}
+                    ${items.length === 0 ? '<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding: 1rem;">Sin artículos</td></tr>' : ''}
                 </tbody>
             </table>
-            <div class="summary-total">
-                <span>Total</span>
-                <span>$${total.toLocaleString()}</span>
-            </div>
+            <div class="summary-total"><span>Total</span><span>$${total.toLocaleString()}</span></div>
         `;
         summaryContainer.appendChild(card);
     });
@@ -187,7 +190,35 @@ window.deleteFixedItem = (index) => {
     render();
 };
 
-// --- ETAPA 2: PANEL QUINCENAL (Gastos Hormiga incluidos) ---
+window.exportData = () => {
+    const data = JSON.stringify(state);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Respaldo_AppPagos_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+};
+
+window.importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const importedState = JSON.parse(e.target.result);
+            if (confirm('¿Estás seguro? Esto reemplazará todos tus datos actuales.')) {
+                state = importedState;
+                saveState();
+                render();
+                alert('Datos cargados con éxito.');
+            }
+        } catch (err) { alert('Error al cargar el archivo.'); }
+    };
+    reader.readAsText(file);
+};
+
+// --- ETAPA 2: PANEL QUINCENAL ---
 function renderPanelQuincena(container) {
     if (!state.currentPeriod) {
         container.innerHTML = `
@@ -216,19 +247,19 @@ function renderPanelQuincena(container) {
             <div class="form-card" style="text-align:center;"><label>Pagado</label><h3 style="color:var(--secondary)">$${paid.toLocaleString()}</h3></div>
         </div>
 
-        <div class="form-card" style="margin-bottom: 2rem;">
-            <h3>+ Agregar Gasto Hormiga</h3>
+        <div class="form-card">
+            <h3 style="margin-bottom: 1rem;">+ Agregar Gasto Hormiga</h3>
             <div class="hormiga-form">
                 <div class="hormiga-inputs">
-                    <div class="input-group"><label>Descripción (Máx 50 car.)</label><input type="text" id="hormiga-desc" maxlength="50" placeholder="Ej: Café y pan"></div>
-                    <div class="input-group"><label>Valor</label><input type="number" id="hormiga-value" placeholder="5000"></div>
+                    <div class="input-group"><label>Descripción</label><input type="text" id="hormiga-desc" maxlength="50" placeholder="Ej: Café"></div>
+                    <div class="input-group"><label>Valor</label><input type="number" id="hormiga-value" placeholder="2000"></div>
                     <div class="input-group">
                         <label>Pago</label>
                         <select id="hormiga-method">
                             <option value="Efectivo">Efectivo</option><option value="Nequi">Nequi</option><option value="Llave">Llave</option>
                         </select>
                     </div>
-                    <button class="btn-add" style="width:auto; margin:0;" onclick="addHormiga()">Agregar</button>
+                    <button class="btn-add" style="width:auto; margin:0; padding: 0.75rem 1.5rem;" onclick="addHormiga()">Agregar</button>
                 </div>
             </div>
         </div>
@@ -258,27 +289,13 @@ window.addHormiga = () => {
     const desc = document.getElementById('hormiga-desc').value;
     const value = document.getElementById('hormiga-value').value;
     if (!desc || !value) return alert('Pon descripción y valor');
-
-    state.currentPeriod.items.push({
-        name: 'Gasto Hormiga',
-        desc: desc,
-        value: value,
-        method: document.getElementById('hormiga-method').value,
-        isHormiga: true,
-        paid: false
-    });
-    saveState();
-    render();
+    state.currentPeriod.items.push({ name: 'Gasto Hormiga', desc, value, method: document.getElementById('hormiga-method').value, isHormiga: true, paid: false });
+    saveState(); render();
 };
 
 window.createPeriod = (range) => {
-    state.currentPeriod = {
-        range,
-        items: state.fixedItems.filter(i => i.range === range).map(i => ({ ...i, paid: false, isHormiga: false })),
-        date: new Date().toISOString()
-    };
-    saveState();
-    render();
+    state.currentPeriod = { range, items: state.fixedItems.filter(i => i.range === range).map(i => ({ ...i, paid: false, isHormiga: false })), date: new Date().toISOString() };
+    saveState(); render();
 };
 
 window.resetPeriod = () => { if (confirm('¿Resetear?')) { state.currentPeriod = null; saveState(); render(); } };
@@ -288,13 +305,12 @@ window.markPaid = (idx) => {
     item.paid = true;
     item.datePaid = new Date().toISOString();
     state.history.push({ ...item, period: state.currentPeriod.range });
-    saveState();
-    render();
+    saveState(); render();
 };
 
 window.removeFromPeriod = (idx) => { state.currentPeriod.items.splice(idx, 1); saveState(); render(); };
 
-// --- ETAPA 3: HISTORIAL (Gráficas incluidas) ---
+// --- ETAPA 3: HISTORIAL ---
 function renderHistory(container) {
     const items = state.historyFilter === 'Todos' ? state.history : state.history.filter(i => i.name === state.historyFilter);
     const total = items.reduce((acc, i) => acc + Number(i.value), 0);
@@ -302,22 +318,18 @@ function renderHistory(container) {
 
     container.innerHTML = `
         <div class="section-header"><h2>Historial</h2><p>${items.length} pagos</p></div>
-        
-        <div class="chart-container">
-            <canvas id="historyChart"></canvas>
-        </div>
-
+        <div class="chart-container"><canvas id="historyChart"></canvas></div>
         <div class="form-card">
             <div style="display:grid; grid-template-columns: 1fr auto; gap:1rem; align-items:end;">
                 <div class="input-group">
-                    <label>Filtrar por Artículo</label>
+                    <label>Filtrar</label>
                     <select onchange="window.updateHistoryFilter(this.value)">
                         <option value="Todos">Todos</option>
                         <option value="Gasto Hormiga">Gastos Hormiga</option>
                         ${names.filter(n => n !== 'Gasto Hormiga').map(n => `<option value="${n}" ${n === state.historyFilter ? 'selected' : ''}>${n}</option>`).join('')}
                     </select>
                 </div>
-                <button class="btn-add" style="background:#15803d" onclick="exportExcel()">Excel</button>
+                <button class="btn-add" style="background:#15803d; width: auto; margin: 0; padding: 0.75rem 1.5rem;" onclick="exportExcel()">Excel</button>
             </div>
             <div style="text-align:center; margin-top:1rem; border-top:1px solid var(--glass-border); padding-top:1rem;">
                 <label>Total Filtrado</label><h3>$${total.toLocaleString()}</h3>
@@ -326,74 +338,35 @@ function renderHistory(container) {
         <div class="items-list">
             ${items.slice().reverse().map(i => `
                 <div class="item-row" style="border-left:4px solid var(--secondary)">
-                    <div class="item-info">
-                        <h3>${i.name} ${i.isHormiga ? `<small>(${i.desc})</small>` : ''}</h3>
-                        <div class="item-details"><span>$${Number(i.value).toLocaleString()}</span><span>•</span><span>${new Date(i.datePaid).toLocaleDateString()}</span></div>
-                    </div>
+                    <div class="item-info"><h3>${i.name} ${i.isHormiga ? `<small>(${i.desc})</small>` : ''}</h3><div class="item-details"><span>$${Number(i.value).toLocaleString()}</span><span>•</span><span>${new Date(i.datePaid).toLocaleDateString()}</span></div></div>
                     <span class="badge" style="background:rgba(16,185,129,0.2); color:var(--secondary)">Pagado</span>
                 </div>
             `).join('')}
         </div>
     `;
-
     setTimeout(() => initChart(items), 100);
 }
 
 function initChart(data) {
     const ctx = document.getElementById('historyChart');
-    if (!ctx) return;
-
-    // Agrupar por fecha
+    if (!ctx || !window.Chart) return;
     const grouped = {};
-    data.forEach(i => {
-        const date = new Date(i.datePaid).toLocaleDateString();
-        grouped[date] = (grouped[date] || 0) + Number(i.value);
-    });
-
-    const labels = Object.keys(grouped);
-    const values = Object.values(grouped);
-
+    data.forEach(i => { const d = new Date(i.datePaid).toLocaleDateString(); grouped[d] = (grouped[d] || 0) + Number(i.value); });
     if (mainChart) mainChart.destroy();
-
     mainChart = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Gastos ($)',
-                data: values,
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                tension: 0.3,
-                fill: true,
-                pointBackgroundColor: '#10b981'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-            },
-            plugins: {
-                legend: { display: false }
-            }
-        }
+        data: { labels: Object.keys(grouped), datasets: [{ label: 'Gastos', data: Object.values(grouped), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.3, fill: true }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } }, plugins: { legend: { display: false } } }
     });
 }
 
-window.updateHistoryFilter = (val) => {
-    state.historyFilter = val;
-    render();
-};
-
+window.updateHistoryFilter = (val) => { state.historyFilter = val; render(); };
 window.exportExcel = () => {
     let csv = "Articulo,Descripcion,Valor,Fecha,Quincena\n";
     state.history.forEach(i => csv += `${i.name},${i.desc || ''},${i.value},${new Date(i.datePaid).toLocaleDateString()},${i.period}\n`);
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `Reporte_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `Reporte_Pagos_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
 };
