@@ -92,27 +92,18 @@ function renderFixedItems(container) {
                 <button class="btn-add" id="btn-save-item">Agregar Artículo</button>
             </div>
         </div>
-        <div class="items-list" id="fixed-items-list"></div>
+
+        <div class="items-list" id="fixed-items-list" style="margin-bottom: 3rem;"></div>
+
+        <div class="section-header">
+            <h2>Resumen Quincenal</h2>
+        </div>
+        <div class="comparison-grid" id="config-summary"></div>
     `;
     container.appendChild(section);
 
-    const list = document.getElementById('fixed-items-list');
-    state.fixedItems.forEach((item, index) => {
-        const row = document.createElement('div');
-        row.className = 'item-row';
-        row.innerHTML = `
-            <div class="item-info">
-                <h3>${item.name}</h3>
-                <div class="item-details">
-                    <span>$${Number(item.value).toLocaleString()}</span><span>•</span><span>${item.method}</span><span>•</span><span class="badge">${item.range}</span>
-                </div>
-            </div>
-            <button class="btn-delete" onclick="deleteFixedItem(${index})">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            </button>
-        `;
-        list.appendChild(row);
-    });
+    renderFixedList();
+    renderConfigSummary();
 
     const btnSave = document.getElementById('btn-save-item');
     if (btnSave) {
@@ -132,6 +123,62 @@ function renderFixedItems(container) {
             render();
         };
     }
+}
+
+function renderFixedList() {
+    const list = document.getElementById('fixed-items-list');
+    if (!list) return;
+
+    state.fixedItems.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        row.innerHTML = `
+            <div class="item-info">
+                <h3>${item.name}</h3>
+                <div class="item-details">
+                    <span>$${Number(item.value).toLocaleString()}</span><span>•</span><span>${item.method}</span><span>•</span><span class="badge">${item.range}</span>
+                </div>
+            </div>
+            <button class="btn-delete" onclick="deleteFixedItem(${index})">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+        `;
+        list.appendChild(row);
+    });
+}
+
+function renderConfigSummary() {
+    const summaryContainer = document.getElementById('config-summary');
+    if (!summaryContainer) return;
+
+    const ranges = ['1er quincena', '2da quincena'];
+
+    ranges.forEach(range => {
+        const items = state.fixedItems.filter(i => i.range === range);
+        const total = items.reduce((acc, i) => acc + Number(i.value), 0);
+
+        const card = document.createElement('div');
+        card.className = 'summary-card';
+        card.innerHTML = `
+            <h3>${range === '1er quincena' ? '1er Quincena' : '2da Quincena'}</h3>
+            <table class="summary-table">
+                <thead>
+                    <tr><th>Artículo</th><th style="text-align:right">Valor</th></tr>
+                </thead>
+                <tbody>
+                    ${items.map(i => `
+                        <tr><td>${i.name}</td><td style="text-align:right">$${Number(i.value).toLocaleString()}</td></tr>
+                    `).join('')}
+                    ${items.length === 0 ? '<tr><td colspan="2" style="text-align:center; color:var(--text-muted)">Sin artículos</td></tr>' : ''}
+                </tbody>
+            </table>
+            <div class="summary-total">
+                <span>Total</span>
+                <span>$${total.toLocaleString()}</span>
+            </div>
+        `;
+        summaryContainer.appendChild(card);
+    });
 }
 
 window.deleteFixedItem = (index) => {
