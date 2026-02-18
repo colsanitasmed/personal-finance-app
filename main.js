@@ -7,6 +7,8 @@ let state = {
     historyFilter: 'Todos'
 };
 
+let mainChart = null;
+
 // Cargar datos desde LocalStorage de forma segura
 function loadPersistedData() {
     try {
@@ -27,7 +29,6 @@ function saveState() {
 
 // Inicialización cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Aplicación de Pagos iniciada...");
     loadPersistedData();
     setupNavigation();
     render();
@@ -139,7 +140,7 @@ window.deleteFixedItem = (index) => {
     render();
 };
 
-// --- ETAPA 2: PANEL QUINCENAL ---
+// --- ETAPA 2: PANEL QUINCENAL (Gastos Hormiga incluidos) ---
 function renderPanelQuincena(container) {
     if (!state.currentPeriod) {
         container.innerHTML = `
@@ -167,12 +168,33 @@ function renderPanelQuincena(container) {
             <div class="form-card" style="text-align:center;"><label>Pendiente</label><h3 style="color:#fbbf24">$${total.toLocaleString()}</h3></div>
             <div class="form-card" style="text-align:center;"><label>Pagado</label><h3 style="color:var(--secondary)">$${paid.toLocaleString()}</h3></div>
         </div>
+
+        <div class="form-card" style="margin-bottom: 2rem;">
+            <h3>+ Agregar Gasto Hormiga</h3>
+            <div class="hormiga-form">
+                <div class="hormiga-inputs">
+                    <div class="input-group"><label>Descripción (Máx 50 car.)</label><input type="text" id="hormiga-desc" maxlength="50" placeholder="Ej: Café y pan"></div>
+                    <div class="input-group"><label>Valor</label><input type="number" id="hormiga-value" placeholder="5000"></div>
+                    <div class="input-group">
+                        <label>Pago</label>
+                        <select id="hormiga-method">
+                            <option value="Efectivo">Efectivo</option><option value="Nequi">Nequi</option><option value="Llave">Llave</option>
+                        </select>
+                    </div>
+                    <button class="btn-add" style="width:auto; margin:0;" onclick="addHormiga()">Agregar</button>
+                </div>
+            </div>
+        </div>
+
         <div class="items-list">
             ${state.currentPeriod.items.map((item, idx) => `
                 <div class="item-row" style="${item.paid ? 'opacity:0.6; border-left:4px solid var(--secondary)' : ''}">
                     <div class="item-info">
                         <h3>${item.name} ${item.paid ? '✓' : ''}</h3>
-                        <div class="item-details"><span>$${Number(item.value).toLocaleString()}</span><span>•</span><span>${item.method}</span></div>
+                        <div class="item-details">
+                            <span>$${Number(item.value).toLocaleString()}</span><span>•</span><span>${item.method}</span>
+                            ${item.isHormiga ? `<br><small style="color:var(--text-muted)">${item.desc || ''}</small>` : ''}
+                        </div>
                     </div>
                     <div style="display:flex; gap:0.5rem">
                         ${!item.paid ? `<button class="btn-add" style="width:auto; margin:0; padding:0.5rem; background:var(--secondary)" onclick="markPaid(${idx})">Pagar</button>` : ''}
@@ -185,10 +207,27 @@ function renderPanelQuincena(container) {
     container.appendChild(section);
 }
 
+window.addHormiga = () => {
+    const desc = document.getElementById('hormiga-desc').value;
+    const value = document.getElementById('hormiga-value').value;
+    if (!desc || !value) return alert('Pon descripción y valor');
+
+    state.currentPeriod.items.push({
+        name: 'Gasto Hormiga',
+        desc: desc,
+        value: value,
+        method: document.getElementById('hormiga-method').value,
+        isHormiga: true,
+        paid: false
+    });
+    saveState();
+    render();
+};
+
 window.createPeriod = (range) => {
     state.currentPeriod = {
         range,
-        items: state.fixedItems.filter(i => i.range === range).map(i => ({ ...i, paid: false })),
+        items: state.fixedItems.filter(i => i.range === range).map(i => ({ ...i, paid: false, isHormiga: false })),
         date: new Date().toISOString()
     };
     saveState();
@@ -208,7 +247,7 @@ window.markPaid = (idx) => {
 
 window.removeFromPeriod = (idx) => { state.currentPeriod.items.splice(idx, 1); saveState(); render(); };
 
-// --- ETAPA 3: HISTORIAL ---
+// --- ETAPA 3: HISTORIAL (Gráficas incluidas) ---
 function renderHistory(container) {
     const items = state.historyFilter === 'Todos' ? state.history : state.history.filter(i => i.name === state.historyFilter);
     const total = items.reduce((acc, i) => acc + Number(i.value), 0);
@@ -216,13 +255,19 @@ function renderHistory(container) {
 
     container.innerHTML = `
         <div class="section-header"><h2>Historial</h2><p>${items.length} pagos</p></div>
+        
+        <div class="chart-container">
+            <canvas id="historyChart"></canvas>
+        </div>
+
         <div class="form-card">
             <div style="display:grid; grid-template-columns: 1fr auto; gap:1rem; align-items:end;">
                 <div class="input-group">
-                    <label>Filtrar</label>
-                    <select onchange="state.historyFilter=this.value; render()">
+                    <label>Filtrar por Artículo</label>
+                    <select onchange="window.updateHistoryFilter(this.value)">
                         <option value="Todos">Todos</option>
-                        ${names.map(n => `<option value="${n}" ${n === state.historyFilter ? 'selected' : ''}>${n}</option>`).join('')}
+                        <option value="Gasto Hormiga">Gastos Hormiga</option>
+                        ${names.filter(n => n !== 'Gasto Hormiga').map(n => `<option value="${n}" ${n === state.historyFilter ? 'selected' : ''}>${n}</option>`).join('')}
                     </select>
                 </div>
                 <button class="btn-add" style="background:#15803d" onclick="exportExcel()">Excel</button>
@@ -234,17 +279,71 @@ function renderHistory(container) {
         <div class="items-list">
             ${items.slice().reverse().map(i => `
                 <div class="item-row" style="border-left:4px solid var(--secondary)">
-                    <div class="item-info"><h3>${i.name}</h3><div class="item-details"><span>$${Number(i.value).toLocaleString()}</span><span>•</span><span>${new Date(i.datePaid).toLocaleDateString()}</span></div></div>
+                    <div class="item-info">
+                        <h3>${i.name} ${i.isHormiga ? `<small>(${i.desc})</small>` : ''}</h3>
+                        <div class="item-details"><span>$${Number(i.value).toLocaleString()}</span><span>•</span><span>${new Date(i.datePaid).toLocaleDateString()}</span></div>
+                    </div>
                     <span class="badge" style="background:rgba(16,185,129,0.2); color:var(--secondary)">Pagado</span>
                 </div>
             `).join('')}
         </div>
     `;
+
+    setTimeout(() => initChart(items), 100);
 }
 
+function initChart(data) {
+    const ctx = document.getElementById('historyChart');
+    if (!ctx) return;
+
+    // Agrupar por fecha
+    const grouped = {};
+    data.forEach(i => {
+        const date = new Date(i.datePaid).toLocaleDateString();
+        grouped[date] = (grouped[date] || 0) + Number(i.value);
+    });
+
+    const labels = Object.keys(grouped);
+    const values = Object.values(grouped);
+
+    if (mainChart) mainChart.destroy();
+
+    mainChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gastos ($)',
+                data: values,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.3,
+                fill: true,
+                pointBackgroundColor: '#10b981'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
+
+window.updateHistoryFilter = (val) => {
+    state.historyFilter = val;
+    render();
+};
+
 window.exportExcel = () => {
-    let csv = "Articulo,Valor,Fecha,Quincena\n";
-    state.history.forEach(i => csv += `${i.name},${i.value},${new Date(i.datePaid).toLocaleDateString()},${i.period}\n`);
+    let csv = "Articulo,Descripcion,Valor,Fecha,Quincena\n";
+    state.history.forEach(i => csv += `${i.name},${i.desc || ''},${i.value},${new Date(i.datePaid).toLocaleDateString()},${i.period}\n`);
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
