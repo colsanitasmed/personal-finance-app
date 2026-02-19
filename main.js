@@ -386,7 +386,10 @@ function renderHistory(container) {
                         ${names.filter(n => n !== 'Gasto Hormiga').map(n => `<option value="${n}" ${n === state.historyFilter ? 'selected' : ''}>${n}</option>`).join('')}
                     </select>
                 </div>
-                <button class="btn-add" style="background:#15803d; width: auto; margin: 0; padding: 0.75rem 1.5rem;" onclick="exportExcel()">Excel</button>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-add" style="background:#15803d; width: auto; margin: 0; padding: 0.75rem 1.5rem;" onclick="exportExcel()">Excel</button>
+                    <button class="btn-delete" style="width: auto; height: auto; padding: 0.75rem 1rem;" onclick="clearHistory()">Borrar Historial</button>
+                </div>
             </div>
             <div style="text-align:center; margin-top:1rem; border-top:1px solid var(--glass-border); padding-top:1rem;">
                 <label>Total Filtrado</label><h3>$${total.toLocaleString()}</h3>
@@ -427,6 +430,17 @@ function initChart(data) {
 }
 
 window.updateHistoryFilter = (val) => { state.historyFilter = val; render(); };
+
+window.clearHistory = () => {
+    if (confirm('¿Estás seguro de que deseas borrar todo el historial y reiniciar el saldo a $0? Esta acción no se puede deshacer.')) {
+        state.history = [];
+        state.balance = 0;
+        saveState();
+        render();
+        alert('Historial y saldo reiniciados con éxito.');
+    }
+};
+
 window.exportExcel = () => {
     let csv = "Articulo,Descripcion,Valor,Metodo,Fecha,Quincena\n";
     state.history.forEach(i => {
