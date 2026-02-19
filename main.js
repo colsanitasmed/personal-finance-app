@@ -4,7 +4,8 @@ let state = {
     fixedItems: [],
     currentPeriod: null,
     history: [],
-    historyFilter: 'Todos'
+    historyFilter: 'Todos',
+    balance: 0
 };
 
 let mainChart = null;
@@ -15,6 +16,7 @@ function loadPersistedData() {
         state.fixedItems = JSON.parse(localStorage.getItem('fixedItems')) || [];
         state.history = JSON.parse(localStorage.getItem('history')) || [];
         state.currentPeriod = JSON.parse(localStorage.getItem('currentPeriod')) || null;
+        state.balance = JSON.parse(localStorage.getItem('balance')) || 0;
     } catch (e) {
         console.error("Error al cargar datos:", e);
     }
@@ -25,6 +27,7 @@ function saveState() {
     localStorage.setItem('fixedItems', JSON.stringify(state.fixedItems));
     localStorage.setItem('history', JSON.stringify(state.history));
     localStorage.setItem('currentPeriod', JSON.stringify(state.currentPeriod));
+    localStorage.setItem('balance', JSON.stringify(state.balance));
 }
 
 // Inicialización cuando el DOM esté listo
@@ -233,8 +236,8 @@ function renderPanelQuincena(container) {
         return;
     }
 
-    const total = state.currentPeriod.items.reduce((acc, i) => acc + (i.paid ? 0 : Number(i.value)), 0);
-    const paid = state.currentPeriod.items.reduce((acc, i) => acc + (i.paid ? Number(i.value) : 0), 0);
+    const pendingValue = state.currentPeriod.items.reduce((acc, i) => acc + (i.paid ? 0 : Number(i.value)), 0);
+    const paidValue = state.currentPeriod.items.reduce((acc, i) => acc + (i.paid ? Number(i.paidValue || i.value) : 0), 0);
 
     const section = document.createElement('section');
     section.innerHTML = `
@@ -242,9 +245,27 @@ function renderPanelQuincena(container) {
             <h2>Corte: ${state.currentPeriod.range}</h2>
             <button class="btn-delete" style="width:auto; height:auto; padding: 0.5rem;" onclick="resetPeriod()">Resetear</button>
         </div>
+        
         <div class="stats-grid">
-            <div class="form-card" style="text-align:center;"><label>Pendiente</label><h3 style="color:#fbbf24">$${total.toLocaleString()}</h3></div>
-            <div class="form-card" style="text-align:center;"><label>Pagado</label><h3 style="color:var(--secondary)">$${paid.toLocaleString()}</h3></div>
+            <div class="form-card" style="text-align:center;"><label>Saldo en Caja</label><h3 style="color:var(--secondary)">$${state.balance.toLocaleString()}</h3></div>
+            <div class="form-card" style="text-align:center;"><label>Pendiente</label><h3 style="color:#fbbf24">$${pendingValue.toLocaleString()}</h3></div>
+        </div>
+
+        <div class="form-card" style="border: 1px solid var(--secondary); background: rgba(16, 185, 129, 0.05);">
+            <h3 style="margin-bottom: 1rem; color: var(--secondary);">+ Registrar Ingreso</h3>
+            <div class="hormiga-form" style="border-top: none; margin-top: 0; padding-top: 0;">
+                <div class="hormiga-inputs">
+                    <div class="input-group"><label>Descripción</label><input type="text" id="income-desc" placeholder="Ej: Sueldo, Venta..."></div>
+                    <div class="input-group"><label>Valor</label><input type="number" id="income-value" placeholder="1000000"></div>
+                    <div class="input-group">
+                        <label>Destino</label>
+                        <select id="income-method">
+                            <option value="Nequi">Nequi</option><option value="Efectivo">Efectivo</option><option value="Llave">Llave</option><option value="Banco">Banco</option>
+                        </select>
+                    </div>
+                    <button class="btn-add" style="width:auto; margin:0; padding: 0.75rem 1.5rem; background: var(--secondary);" onclick="addIncome()">Agregar</button>
+                </div>
+            </div>
         </div>
 
         <div class="form-card">
@@ -267,15 +288,20 @@ function renderPanelQuincena(container) {
         <div class="items-list">
             ${state.currentPeriod.items.map((item, idx) => `
                 <div class="item-row" style="${item.paid ? 'opacity:0.6; border-left:4px solid var(--secondary)' : ''}">
-                    <div class="item-info">
+                    <div class="item-info" style="flex: 1;">
                         <h3>${item.name} ${item.paid ? '✓' : ''}</h3>
                         <div class="item-details">
-                            <span>$${Number(item.value).toLocaleString()}</span><span>•</span><span>${item.method}</span>
+                            ${!item.paid ? `
+                                <div class="input-group" style="width: 120px;">
+                                    <input type="number" id="input-pay-${idx}" value="${item.value}" style="padding: 0.4rem; font-size: 0.9rem;">
+                                </div>
+                            ` : `<span>$${Number(item.paidValue || item.value).toLocaleString()}</span>`}
+                            <span>•</span><span>${item.method}</span>
                             ${item.isHormiga ? `<br><small style="color:var(--text-muted)">${item.desc || ''}</small>` : ''}
                         </div>
                     </div>
-                    <div style="display:flex; gap:0.5rem">
-                        ${!item.paid ? `<button class="btn-add" style="width:auto; margin:0; padding:0.5rem; background:var(--secondary)" onclick="markPaid(${idx})">Pagar</button>` : ''}
+                    <div style="display:flex; gap:0.5rem; align-items: center;">
+                        ${!item.paid ? `<button class="btn-add" style="width:auto; margin:0; padding:0.5rem 1rem; background:var(--secondary)" onclick="markPaid(${idx})">Pagar</button>` : ''}
                         <button class="btn-delete" onclick="removeFromPeriod(${idx})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
                     </div>
                 </div>
@@ -300,12 +326,43 @@ window.createPeriod = (range) => {
 
 window.resetPeriod = () => { if (confirm('¿Resetear?')) { state.currentPeriod = null; saveState(); render(); } };
 
+window.addIncome = () => {
+    const desc = document.getElementById('income-desc').value;
+    const value = Number(document.getElementById('income-value').value);
+    const method = document.getElementById('income-method').value;
+
+    if (!desc || !value) return alert('Pon descripción y valor');
+
+    state.balance += value;
+    state.history.push({
+        name: 'Ingreso',
+        desc: desc,
+        value: value,
+        method: method,
+        isIncome: true,
+        datePaid: new Date().toISOString(),
+        period: state.currentPeriod ? state.currentPeriod.range : 'N/A'
+    });
+
+    saveState();
+    render();
+};
+
 window.markPaid = (idx) => {
     const item = state.currentPeriod.items[idx];
+    const adjustedValue = Number(document.getElementById(`input-pay-${idx}`).value);
+
+    if (isNaN(adjustedValue) || adjustedValue <= 0) return alert('Ingresa un valor válido');
+
     item.paid = true;
+    item.paidValue = adjustedValue; // Guardamos el valor real pagado
     item.datePaid = new Date().toISOString();
-    state.history.push({ ...item, period: state.currentPeriod.range });
-    saveState(); render();
+
+    state.balance -= adjustedValue;
+    state.history.push({ ...item, value: adjustedValue, period: state.currentPeriod.range });
+
+    saveState();
+    render();
 };
 
 window.removeFromPeriod = (idx) => { state.currentPeriod.items.splice(idx, 1); saveState(); render(); };
@@ -337,9 +394,18 @@ function renderHistory(container) {
         </div>
         <div class="items-list">
             ${items.slice().reverse().map(i => `
-                <div class="item-row" style="border-left:4px solid var(--secondary)">
-                    <div class="item-info"><h3>${i.name} ${i.isHormiga ? `<small>(${i.desc})</small>` : ''}</h3><div class="item-details"><span>$${Number(i.value).toLocaleString()}</span><span>•</span><span>${new Date(i.datePaid).toLocaleDateString()}</span></div></div>
-                    <span class="badge" style="background:rgba(16,185,129,0.2); color:var(--secondary)">Pagado</span>
+                <div class="item-row" style="border-left:4px solid ${i.isIncome ? 'var(--secondary)' : 'var(--primary)'}">
+                    <div class="item-info">
+                        <h3>${i.name} ${i.isHormiga ? `<small>(${i.desc})</small>` : ''} ${i.isIncome ? `<small style="color:var(--secondary)">(${i.desc})</small>` : ''}</h3>
+                        <div class="item-details">
+                            <span style="color: ${i.isIncome ? 'var(--secondary)' : 'white'}">${i.isIncome ? '+' : ''}$${Number(i.value).toLocaleString()}</span>
+                            <span>•</span><span>${new Date(i.datePaid).toLocaleDateString()}</span>
+                            <span>•</span><span>${i.method}</span>
+                        </div>
+                    </div>
+                    <span class="badge" style="background:${i.isIncome ? 'rgba(16,185,129,0.2)' : 'rgba(99,102,241,0.2)'}; color:${i.isIncome ? 'var(--secondary)' : 'var(--primary)'}">
+                        ${i.isIncome ? 'Ingreso' : 'Pagado'}
+                    </span>
                 </div>
             `).join('')}
         </div>
@@ -362,8 +428,11 @@ function initChart(data) {
 
 window.updateHistoryFilter = (val) => { state.historyFilter = val; render(); };
 window.exportExcel = () => {
-    let csv = "Articulo,Descripcion,Valor,Fecha,Quincena\n";
-    state.history.forEach(i => csv += `${i.name},${i.desc || ''},${i.value},${new Date(i.datePaid).toLocaleDateString()},${i.period}\n`);
+    let csv = "Articulo,Descripcion,Valor,Metodo,Fecha,Quincena\n";
+    state.history.forEach(i => {
+        const val = i.isIncome ? i.value : -i.value;
+        csv += `${i.name},${i.desc || ''},${val},${i.method},${new Date(i.datePaid).toLocaleDateString()},${i.period}\n`;
+    });
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
