@@ -52,6 +52,7 @@ h1 {
     font-weight: 700;
     background: linear-gradient(to right, #818cf8, #34d399);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -137,6 +138,23 @@ select {
 input:focus,
 select:focus {
     border-color: var(--primary);
+}
+
+.income-card {
+    border: 1px solid var(--secondary) !important;
+    background: rgba(16, 185, 129, 0.05) !important;
+}
+
+.income-card h3 {
+    color: var(--secondary) !important;
+}
+
+.income-card .btn-add {
+    background: var(--secondary) !important;
+}
+
+.income-card .btn-add:hover {
+    background: #059669 !important;
 }
 
 .btn-add {

@@ -251,8 +251,8 @@ function renderPanelQuincena(container) {
             <div class="form-card" style="text-align:center;"><label>Pendiente</label><h3 style="color:#fbbf24">$${pendingValue.toLocaleString()}</h3></div>
         </div>
 
-        <div class="form-card" style="border: 1px solid var(--secondary); background: rgba(16, 185, 129, 0.05);">
-            <h3 style="margin-bottom: 1rem; color: var(--secondary);">+ Registrar Ingreso</h3>
+        <div class="form-card income-card">
+            <h3 style="margin-bottom: 1rem;">+ Registrar Ingreso</h3>
             <div class="hormiga-form" style="border-top: none; margin-top: 0; padding-top: 0;">
                 <div class="hormiga-inputs">
                     <div class="input-group"><label>Descripción</label><input type="text" id="income-desc" placeholder="Ej: Sueldo, Venta..."></div>
