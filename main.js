@@ -297,6 +297,7 @@ function renderPanelQuincena(container) {
                                 </div>
                             ` : `<span>$${Number(item.paidValue || item.value).toLocaleString()}</span>`}
                             <span>•</span><span>${item.method}</span>
+                            ${item.account ? `<br><small style="color:var(--secondary); font-weight:600;">Cuenta: ${item.account}</small>` : ''}
                             ${item.isHormiga ? `<br><small style="color:var(--text-muted)">${item.desc || ''}</small>` : ''}
                         </div>
                     </div>
@@ -320,7 +321,7 @@ window.addHormiga = () => {
 };
 
 window.createPeriod = (range) => {
-    state.currentPeriod = { range, items: state.fixedItems.filter(i => i.range === range).map(i => ({ ...i, paid: false, isHormiga: false })), date: new Date().toISOString() };
+    state.currentPeriod = { range, items: state.fixedItems.filter(i => i.range === range).map(i => ({ ...i, paid: false, isHormiga: false, account: i.account })), date: new Date().toISOString() };
     saveState(); render();
 };
 
